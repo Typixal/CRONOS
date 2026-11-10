@@ -51,10 +51,30 @@ void test_copy_then_lit_ops_append_in_order(void) {
     TEST_ASSERT_EQUAL_UINT8_ARRAY("hello!", out, 6);
 }
 
+/* ADD op: 0x01, u32 LE base_off, u32 LE len, then len diff bytes.
+ * out[i] = base[base_off + i] + diff[i], wrapping mod 256. */
+void test_add_segment_adds_diff_to_base_with_wraparound(void) {
+    const uint8_t base[] = {0x00, 10, 20, 250};
+    const uint8_t seg[] = {0x01,
+                           0x01, 0x00, 0x00, 0x00,   /* base_off = 1 */
+                           0x03, 0x00, 0x00, 0x00,   /* len = 3 */
+                           1, 2, 10};                /* diff bytes */
+    const uint8_t expected[] = {11, 22, 4};          /* 250 + 10 wraps to 4 */
+    uint8_t out[3] = {0};
+
+    ftota_status_t st = ftota_apply_segment(base, sizeof base,
+                                            seg, sizeof seg,
+                                            out, sizeof out);
+
+    TEST_ASSERT_EQUAL_INT(FTOTA_OK, st);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(expected, out, 3);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_lit_only_segment_emits_literal_bytes);
     RUN_TEST(test_copy_segment_emits_bytes_from_base);
     RUN_TEST(test_copy_then_lit_ops_append_in_order);
+    RUN_TEST(test_add_segment_adds_diff_to_base_with_wraparound);
     return UNITY_END();
 }

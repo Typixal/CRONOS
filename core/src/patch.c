@@ -3,6 +3,7 @@
 #include <string.h>
 
 #define OP_COPY 0x00
+#define OP_ADD  0x01
 #define OP_LIT  0x02
 
 /* Read 4 bytes as little-endian u32. Byte-by-byte, not a pointer cast:
@@ -35,6 +36,15 @@ ftota_status_t ftota_apply_segment(const uint8_t *base, size_t base_len,
             uint32_t len      = read_u32_le(seg + seg_pos + 5);
             memcpy(out + out_pos, base + base_off, len);
             seg_pos += 9;
+            out_pos += len;
+        } else if (op == OP_ADD) {
+            uint32_t base_off = read_u32_le(seg + seg_pos + 1);
+            uint32_t len      = read_u32_le(seg + seg_pos + 5);
+            const uint8_t *diff = seg + seg_pos + 9;
+            for (uint32_t i = 0; i < len; i++) {
+                out[out_pos + i] = (uint8_t)(base[base_off + i] + diff[i]);
+            }
+            seg_pos += 9u + len;
             out_pos += len;
         } else if (op == OP_LIT) {
             uint32_t len = read_u32_le(seg + seg_pos + 1);
