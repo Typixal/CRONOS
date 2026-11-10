@@ -70,11 +70,28 @@ void test_add_segment_adds_diff_to_base_with_wraparound(void) {
     TEST_ASSERT_EQUAL_UINT8_ARRAY(expected, out, 3);
 }
 
+/* T03: LIT says 5 data bytes, but patch ends after 2. Must reject.
+ * buf holds all 5 bytes on purpose, so the unfixed decoder reads valid
+ * memory and fails by assertion, not by an ASan crash. */
+void test_lit_with_truncated_data_is_rejected(void) {
+    const uint8_t buf[] = {0x02,
+                           0x05, 0x00, 0x00, 0x00,   /* len = 5 */
+                           'a', 'b', 'c', 'd', 'e'};
+    uint8_t out[5] = {0};
+
+    /* seg_len = 7: op byte + 4 length bytes + only 2 of 5 data bytes */
+    ftota_status_t st = ftota_apply_segment(NULL, 0, buf, 7,
+                                            out, sizeof out);
+
+    TEST_ASSERT_EQUAL_INT(FTOTA_ERR_TRUNCATED, st);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_lit_only_segment_emits_literal_bytes);
     RUN_TEST(test_copy_segment_emits_bytes_from_base);
     RUN_TEST(test_copy_then_lit_ops_append_in_order);
     RUN_TEST(test_add_segment_adds_diff_to_base_with_wraparound);
+    RUN_TEST(test_lit_with_truncated_data_is_rejected);
     return UNITY_END();
 }

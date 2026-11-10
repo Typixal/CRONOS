@@ -17,8 +17,8 @@ static uint32_t read_u32_le(const uint8_t *p)
          | ((uint32_t)p[3] << 24);
 }
 
-/* Minimal GREEN: run ops in order until segment ends. No bounds checks yet.
- * Checks arrive test-first (T03 truncated, T04 bad base_off). */
+/* GREEN so far: only LIT data length is checked (T03, first case).
+ * Header-length, ADD, COPY and output checks arrive test-first. */
 ftota_status_t ftota_apply_segment(const uint8_t *base, size_t base_len,
                                    const uint8_t *seg, size_t seg_len,
                                    uint8_t *out, size_t out_len)
@@ -30,6 +30,7 @@ ftota_status_t ftota_apply_segment(const uint8_t *base, size_t base_len,
 
     while (seg_pos < seg_len) {
         uint8_t op = seg[seg_pos];
+        size_t remaining = seg_len - seg_pos;   /* bytes left, op byte incl. */
 
         if (op == OP_COPY) {
             uint32_t base_off = read_u32_le(seg + seg_pos + 1);
@@ -48,6 +49,9 @@ ftota_status_t ftota_apply_segment(const uint8_t *base, size_t base_len,
             out_pos += len;
         } else if (op == OP_LIT) {
             uint32_t len = read_u32_le(seg + seg_pos + 1);
+            if (len > remaining - 5) {
+                return FTOTA_ERR_TRUNCATED;
+            }
             memcpy(out + out_pos, seg + seg_pos + 5, len);
             seg_pos += 5u + len;
             out_pos += len;

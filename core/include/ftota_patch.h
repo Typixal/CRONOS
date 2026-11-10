@@ -6,7 +6,8 @@
 
 typedef enum {
     FTOTA_OK = 0,
-    FTOTA_ERR_UNIMPLEMENTED = -1
+    FTOTA_ERR_UNIMPLEMENTED = -1,
+    FTOTA_ERR_TRUNCATED = -2     /* patch ends before an op is complete */
 } ftota_status_t;
 
 /* Decode one patch segment into out[0..out_len). Base is read-only. */
