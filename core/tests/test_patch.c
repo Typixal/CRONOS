@@ -32,9 +32,29 @@ void test_copy_segment_emits_bytes_from_base(void) {
     TEST_ASSERT_EQUAL_UINT8_ARRAY("world", out, 5);
 }
 
+/* Ops run in order, each appends to out. COPY then LIT. */
+void test_copy_then_lit_ops_append_in_order(void) {
+    const uint8_t base[] = "hello world";
+    const uint8_t seg[] = {0x00,
+                           0x00, 0x00, 0x00, 0x00,   /* base_off = 0 */
+                           0x05, 0x00, 0x00, 0x00,   /* len = 5 */
+                           0x02,
+                           0x01, 0x00, 0x00, 0x00,   /* len = 1 */
+                           '!'};
+    uint8_t out[6] = {0};
+
+    ftota_status_t st = ftota_apply_segment(base, sizeof base - 1,
+                                            seg, sizeof seg,
+                                            out, sizeof out);
+
+    TEST_ASSERT_EQUAL_INT(FTOTA_OK, st);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY("hello!", out, 6);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_lit_only_segment_emits_literal_bytes);
     RUN_TEST(test_copy_segment_emits_bytes_from_base);
+    RUN_TEST(test_copy_then_lit_ops_append_in_order);
     return UNITY_END();
 }

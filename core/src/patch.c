@@ -16,24 +16,34 @@ static uint32_t read_u32_le(const uint8_t *p)
          | ((uint32_t)p[3] << 24);
 }
 
-/* Minimal GREEN: first op only, no bounds checks yet.
+/* Minimal GREEN: run ops in order until segment ends. No bounds checks yet.
  * Checks arrive test-first (T03 truncated, T04 bad base_off). */
 ftota_status_t ftota_apply_segment(const uint8_t *base, size_t base_len,
                                    const uint8_t *seg, size_t seg_len,
                                    uint8_t *out, size_t out_len)
 {
-    (void)base_len; (void)seg_len; (void)out_len;
+    (void)base_len; (void)out_len;
 
-    if (seg[0] == OP_COPY) {
-        uint32_t base_off = read_u32_le(seg + 1);
-        uint32_t len      = read_u32_le(seg + 5);
-        memcpy(out, base + base_off, len);
-        return FTOTA_OK;
+    size_t seg_pos = 0;   /* next unread byte in seg */
+    size_t out_pos = 0;   /* next unwritten byte in out */
+
+    while (seg_pos < seg_len) {
+        uint8_t op = seg[seg_pos];
+
+        if (op == OP_COPY) {
+            uint32_t base_off = read_u32_le(seg + seg_pos + 1);
+            uint32_t len      = read_u32_le(seg + seg_pos + 5);
+            memcpy(out + out_pos, base + base_off, len);
+            seg_pos += 9;
+            out_pos += len;
+        } else if (op == OP_LIT) {
+            uint32_t len = read_u32_le(seg + seg_pos + 1);
+            memcpy(out + out_pos, seg + seg_pos + 5, len);
+            seg_pos += 5u + len;
+            out_pos += len;
+        } else {
+            return FTOTA_ERR_UNIMPLEMENTED;
+        }
     }
-    if (seg[0] == OP_LIT) {
-        uint32_t len = read_u32_le(seg + 1);
-        memcpy(out, seg + 5, len);
-        return FTOTA_OK;
-    }
-    return FTOTA_ERR_UNIMPLEMENTED;
+    return FTOTA_OK;
 }
