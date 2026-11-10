@@ -6,6 +6,8 @@
 #define OP_ADD  0x01
 #define OP_LIT  0x02
 
+#define LIT_HEADER_SIZE 5   /* op byte + u32 length */
+
 /* Read 4 bytes as little-endian u32. Byte-by-byte, not a pointer cast:
  * a cast to uint32_t* can be misaligned and depends on host endianness.
  * This works the same on x86 host and ESP32-S3. */
@@ -17,8 +19,8 @@ static uint32_t read_u32_le(const uint8_t *p)
          | ((uint32_t)p[3] << 24);
 }
 
-/* GREEN so far: only LIT data length is checked (T03, first case).
- * Header-length, ADD, COPY and output checks arrive test-first. */
+/* GREEN so far: LIT header and LIT data lengths are checked (T03).
+ * COPY, ADD and output checks arrive test-first. */
 ftota_status_t ftota_apply_segment(const uint8_t *base, size_t base_len,
                                    const uint8_t *seg, size_t seg_len,
                                    uint8_t *out, size_t out_len)
@@ -48,12 +50,15 @@ ftota_status_t ftota_apply_segment(const uint8_t *base, size_t base_len,
             seg_pos += 9u + len;
             out_pos += len;
         } else if (op == OP_LIT) {
-            uint32_t len = read_u32_le(seg + seg_pos + 1);
-            if (len > remaining - 5) {
+            if (remaining < LIT_HEADER_SIZE) {
                 return FTOTA_ERR_TRUNCATED;
             }
-            memcpy(out + out_pos, seg + seg_pos + 5, len);
-            seg_pos += 5u + len;
+            uint32_t len = read_u32_le(seg + seg_pos + 1);
+            if (len > remaining - LIT_HEADER_SIZE) {
+                return FTOTA_ERR_TRUNCATED;
+            }
+            memcpy(out + out_pos, seg + seg_pos + LIT_HEADER_SIZE, len);
+            seg_pos += LIT_HEADER_SIZE + len;
             out_pos += len;
         } else {
             return FTOTA_ERR_UNIMPLEMENTED;
