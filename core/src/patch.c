@@ -6,7 +6,8 @@
 #define OP_ADD  0x01
 #define OP_LIT  0x02
 
-#define LIT_HEADER_SIZE 5   /* op byte + u32 length */
+#define COPY_HEADER_SIZE 9   /* op byte + u32 base_off + u32 len */
+#define LIT_HEADER_SIZE  5   /* op byte + u32 length */
 
 /* Read 4 bytes as little-endian u32. Byte-by-byte, not a pointer cast:
  * a cast to uint32_t* can be misaligned and depends on host endianness.
@@ -19,8 +20,8 @@ static uint32_t read_u32_le(const uint8_t *p)
          | ((uint32_t)p[3] << 24);
 }
 
-/* GREEN so far: LIT header and LIT data lengths are checked (T03).
- * COPY, ADD and output checks arrive test-first. */
+/* GREEN so far: LIT header+data and COPY header lengths are checked (T03).
+ * ADD, COPY range and output checks arrive test-first. */
 ftota_status_t ftota_apply_segment(const uint8_t *base, size_t base_len,
                                    const uint8_t *seg, size_t seg_len,
                                    uint8_t *out, size_t out_len)
@@ -35,10 +36,13 @@ ftota_status_t ftota_apply_segment(const uint8_t *base, size_t base_len,
         size_t remaining = seg_len - seg_pos;   /* bytes left, op byte incl. */
 
         if (op == OP_COPY) {
+            if (remaining < COPY_HEADER_SIZE) {
+                return FTOTA_ERR_TRUNCATED;
+            }
             uint32_t base_off = read_u32_le(seg + seg_pos + 1);
             uint32_t len      = read_u32_le(seg + seg_pos + 5);
             memcpy(out + out_pos, base + base_off, len);
-            seg_pos += 9;
+            seg_pos += COPY_HEADER_SIZE;
             out_pos += len;
         } else if (op == OP_ADD) {
             uint32_t base_off = read_u32_le(seg + seg_pos + 1);

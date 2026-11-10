@@ -102,6 +102,23 @@ void test_lit_with_truncated_header_is_rejected(void) {
     TEST_ASSERT_EQUAL_INT(FTOTA_ERR_TRUNCATED, st);
 }
 
+/* T03: patch ends inside the COPY header. op + base_off + 1 of 4 len bytes.
+ * buf is full size on purpose: unfixed decoder reads valid memory, so RED
+ * is an assertion failure, not an ASan crash. */
+void test_copy_with_truncated_header_is_rejected(void) {
+    const uint8_t base[] = "hello world";
+    const uint8_t buf[] = {0x00,
+                           0x00, 0x00, 0x00, 0x00,   /* base_off = 0 */
+                           0x05, 0x00, 0x00, 0x00};  /* len = 5 */
+    uint8_t out[5] = {0};
+
+    /* seg_len = 6: op byte + 4 base_off bytes + only 1 of 4 len bytes */
+    ftota_status_t st = ftota_apply_segment(base, sizeof base - 1, buf, 6,
+                                            out, sizeof out);
+
+    TEST_ASSERT_EQUAL_INT(FTOTA_ERR_TRUNCATED, st);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_lit_only_segment_emits_literal_bytes);
@@ -110,5 +127,6 @@ int main(void) {
     RUN_TEST(test_add_segment_adds_diff_to_base_with_wraparound);
     RUN_TEST(test_lit_with_truncated_data_is_rejected);
     RUN_TEST(test_lit_with_truncated_header_is_rejected);
+    RUN_TEST(test_copy_with_truncated_header_is_rejected);
     return UNITY_END();
 }
