@@ -155,6 +155,38 @@ void test_add_with_truncated_diff_is_rejected(void) {
     TEST_ASSERT_EQUAL_INT(FTOTA_ERR_TRUNCATED, st);
 }
 
+/* T04: COPY reads past end of base. base is 4 bytes, COPY wants 5 from
+ * offset 2. out is big enough, so unfixed decoder fails by assertion
+ * only if it reads valid memory: base2 is padded to hold the bad read. */
+void test_copy_beyond_base_is_rejected(void) {
+    const uint8_t base[16] = {0};          /* real memory is 16 bytes ... */
+    const uint8_t seg[] = {0x00,
+                           0x02, 0x00, 0x00, 0x00,   /* base_off = 2 */
+                           0x05, 0x00, 0x00, 0x00};  /* len = 5 */
+    uint8_t out[5] = {0};
+
+    /* ... but we tell the decoder base_len = 4. 2 + 5 = 7 > 4 */
+    ftota_status_t st = ftota_apply_segment(base, 4, seg, sizeof seg,
+                                            out, sizeof out);
+
+    TEST_ASSERT_EQUAL_INT(FTOTA_ERR_RANGE, st);
+}
+
+/* T04: same for ADD. 3 diff bytes present, so truncation check passes. */
+void test_add_beyond_base_is_rejected(void) {
+    const uint8_t base[16] = {0};
+    const uint8_t seg[] = {0x01,
+                           0x02, 0x00, 0x00, 0x00,   /* base_off = 2 */
+                           0x03, 0x00, 0x00, 0x00,   /* len = 3 */
+                           1, 2, 3};
+    uint8_t out[3] = {0};
+
+    ftota_status_t st = ftota_apply_segment(base, 4, seg, sizeof seg,
+                                            out, sizeof out);
+
+    TEST_ASSERT_EQUAL_INT(FTOTA_ERR_RANGE, st);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_lit_only_segment_emits_literal_bytes);
@@ -166,5 +198,7 @@ int main(void) {
     RUN_TEST(test_copy_with_truncated_header_is_rejected);
     RUN_TEST(test_add_with_truncated_header_is_rejected);
     RUN_TEST(test_add_with_truncated_diff_is_rejected);
+    RUN_TEST(test_copy_beyond_base_is_rejected);
+    RUN_TEST(test_add_beyond_base_is_rejected);
     return UNITY_END();
 }

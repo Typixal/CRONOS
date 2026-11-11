@@ -27,7 +27,7 @@ ftota_status_t ftota_apply_segment(const uint8_t *base, size_t base_len,
                                    const uint8_t *seg, size_t seg_len,
                                    uint8_t *out, size_t out_len)
 {
-    (void)base_len; (void)out_len;
+    (void)out_len;
 
     size_t seg_pos = 0;   /* next unread byte in seg */
     size_t out_pos = 0;   /* next unwritten byte in out */
@@ -42,6 +42,9 @@ ftota_status_t ftota_apply_segment(const uint8_t *base, size_t base_len,
             }
             uint32_t base_off = read_u32_le(seg + seg_pos + 1);
             uint32_t len      = read_u32_le(seg + seg_pos + 5);
+            if (base_off > base_len || len > base_len - base_off) {
+                return FTOTA_ERR_RANGE;
+            }
             memcpy(out + out_pos, base + base_off, len);
             seg_pos += COPY_HEADER_SIZE;
             out_pos += len;
@@ -53,6 +56,9 @@ ftota_status_t ftota_apply_segment(const uint8_t *base, size_t base_len,
             uint32_t len      = read_u32_le(seg + seg_pos + 5);
             if (len > remaining - ADD_HEADER_SIZE) {
                 return FTOTA_ERR_TRUNCATED;
+            }
+            if (base_off > base_len || len > base_len - base_off) {
+                return FTOTA_ERR_RANGE;
             }
             const uint8_t *diff = seg + seg_pos + ADD_HEADER_SIZE;
             for (uint32_t i = 0; i < len; i++) {
