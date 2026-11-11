@@ -51,6 +51,9 @@ ftota_status_t ftota_apply_segment(const uint8_t *base, size_t base_len,
             }
             uint32_t base_off = read_u32_le(seg + seg_pos + 1);
             uint32_t len      = read_u32_le(seg + seg_pos + 5);
+            if (len > remaining - ADD_HEADER_SIZE) {
+                return FTOTA_ERR_TRUNCATED;
+            }
             const uint8_t *diff = seg + seg_pos + ADD_HEADER_SIZE;
             for (uint32_t i = 0; i < len; i++) {
                 out[out_pos + i] = (uint8_t)(base[base_off + i] + diff[i]);
